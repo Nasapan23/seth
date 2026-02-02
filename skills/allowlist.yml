@@ -1,0 +1,68 @@
+# Seth Skills Allowlist
+# Only skills listed here are enabled
+# Edit this file to enable/disable skills per phase
+
+# =============================================================================
+# Phase 1 - Passive Skills (Default Enabled)
+# =============================================================================
+phase1:
+  enabled: true
+  skills:
+    - reminders    # Local reminder management
+    - calendar     # Read-only calendar queries
+
+# =============================================================================
+# Phase 2 - Notification Skills
+# =============================================================================
+phase2:
+  enabled: false   # Set to true when ready
+  skills:
+    - notifications  # Push/webhook notifications
+  config:
+    notifications:
+      rate_limit: 10/hour
+      quiet_hours:
+        start: "22:00"
+        end: "08:00"
+
+# =============================================================================
+# Phase 3 - Email Skills
+# =============================================================================
+phase3:
+  enabled: false   # Set to true when ready
+  skills:
+    - email        # Email send/read
+  config:
+    email:
+      send_enabled: true
+      read_enabled: false  # Start with send-only
+      allowed_domains: []  # Empty = all domains
+
+# =============================================================================
+# Phase 4 - Voice Skills
+# =============================================================================
+phase4:
+  enabled: false   # Set to true when ready
+  skills:
+    - voice        # TTS/STT
+  config:
+    voice:
+      tts_provider: "elevenlabs"
+      stt_provider: "openai"
+      local_only: true
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+settings:
+  # Require confirmation for destructive actions
+  require_confirmation:
+    - delete
+    - modify
+    - send
+  
+  # Log all skill invocations
+  audit_log: true
+  
+  # Maximum skill execution time (seconds)
+  timeout: 60

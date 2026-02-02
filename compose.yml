@@ -1,0 +1,187 @@
+# Seth - Docker Compose Stack (Production Ready)
+# Works on: Linux (ARM64/x86_64), Windows (Docker Desktop), macOS (Docker Desktop)
+#
+# Quick Start:
+#   1. cp .env.example .env && edit .env
+#   2. docker compose build
+#   3. docker compose up -d
+#
+# Portainer: Add as Stack, upload compose.yml, set env vars, deploy
+
+services:
+  # ==========================================================================
+  # Primary Seth Container - OpenClaw Gateway + UI
+  # ==========================================================================
+  seth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_VERSION: ${SETH_IMAGE_TAG:-latest}
+        SETH_UID: ${SETH_UID:-1000}
+        SETH_GID: ${SETH_GID:-1000}
+    image: seth:${SETH_IMAGE_TAG:-latest}
+    container_name: seth
+    restart: unless-stopped
+    
+    # Security hardening (with Playwright/Chromium support)
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:unconfined  # Required for Chromium inside Docker
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - SYS_ADMIN  # Required for Chromium sandbox (alternative to --no-sandbox)
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    
+    # Environment
+    environment:
+      # Gateway configuration
+      - SETH_GATEWAY_TOKEN=${SETH_GATEWAY_TOKEN:?Gateway token is required}
+      - SETH_BIND_ADDR=${SETH_BIND_ADDR:-0.0.0.0}
+      - SETH_PORT=${SETH_PORT:-18789}
+      
+      # Model provider (OpenRouter - access to all models)
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      
+      # Model strategy (cost optimization via OpenRouter)
+      - SETH_MODEL=${SETH_MODEL:-anthropic/claude-3-haiku}
+      - SETH_SMART_MODEL=${SETH_SMART_MODEL:-anthropic/claude-sonnet-4}
+      - SETH_SUBAGENT_MODEL=${SETH_SUBAGENT_MODEL:-anthropic/claude-3-haiku}
+      
+      # Optional features
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      
+      # Voice (Phase 4)
+      - SETH_VOICE_ENABLED=${SETH_VOICE_ENABLED:-false}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-}
+    
+    # Volumes - persistent state
+    volumes:
+      # OpenClaw config and state
+      - ./data/openclaw:/home/seth/.openclaw
+      
+      # Agent workspace
+      - ./data/workspace:/home/seth/workspace
+      
+      # Skills (read-only)
+      - ./skills/local:/opt/seth/skills:ro
+      - ./skills/allowlist.yml:/opt/seth/allowlist.yml:ro
+      
+      # Prompts (read-only)
+      - ./prompts:/opt/seth/prompts:ro
+      
+      # Playwright browser cache (optional persistence)
+      - seth_browser_cache:/home/seth/.cache/ms-playwright
+      
+      # Temp filesystem
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 256M
+    
+    # Ports - exposed for nginx reverse proxy
+    ports:
+      - "${SETH_PORT:-18789}:18789"     # Gateway + WebChat UI
+      - "${SETH_BROWSER_CDP_PORT:-18800}:18800"  # Browser CDP (optional, for debugging)
+    
+    # Network
+    networks:
+      - seth_net
+    
+    # Logging
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Health check (overrides Dockerfile)
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ==========================================================================
+  # Optional: Headless Job Runner (disabled by default)
+  # Enable by setting SETH_HEADLESS_ENABLED=true
+  # ==========================================================================
+  seth-headless:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OPENCLAW_VERSION: ${SETH_IMAGE_TAG:-latest}
+        SETH_UID: ${SETH_UID:-1000}
+        SETH_GID: ${SETH_GID:-1000}
+    image: seth:${SETH_IMAGE_TAG:-latest}
+    container_name: seth-headless
+    restart: unless-stopped
+    profiles:
+      - headless  # Only starts with: docker compose --profile headless up
+    
+    # Override command for job runner mode
+    command: ["headless"]
+    
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    
+    # Volumes - shared with main container
+    volumes:
+      - ./data/workspace:/home/seth/workspace
+      - seth_browser_cache:/home/seth/.cache/ms-playwright
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          size: 256M
+    
+    # Network
+    networks:
+      - seth_net
+    
+    # Logging
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  seth_net:
+    driver: bridge
+    name: seth_net
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  seth_browser_cache:
+    name: seth_browser_cache

@@ -1,0 +1,258 @@
+// Seth - OpenClaw Configuration Template (Cost-Optimized Edition)
+// Copy to data/openclaw/openclaw.json and customize
+// JSON5 format: comments and trailing commas allowed
+//
+// COST OPTIMIZATION STRATEGY:
+// - Default model: CHEAP (Haiku/GPT-4o-mini) for casual chat
+// - Smart model: Sonnet for complex tasks (switch with /model smart)
+// - Sub-agents: CHEAP model (workers don't need to be smart)
+// - Thinking: OFF by default (saves tokens)
+// - Fallbacks: FREE OpenRouter models when rate-limited
+//
+// Documentation: https://docs.openclaw.ai/gateway/configuration
+
+{
+  // =========================================================================
+  // Gateway Configuration
+  // =========================================================================
+  gateway: {
+    bind: "lan",
+    port: 18789,
+    auth: {
+      mode: "token",
+    },
+  },
+
+  // =========================================================================
+  // Agent Configuration (Cost-Optimized)
+  // =========================================================================
+  agents: {
+    defaults: {
+      workspace: "/home/seth/workspace",
+      
+      // PRIMARY: Cheap model for casual chat, greetings, simple Q&A
+      // Switch to smart model with: /model smart
+      model: {
+        primary: "${SETH_MODEL}",  // anthropic/claude-haiku-3
+        fallbacks: [
+          "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+          "openrouter/google/gemma-2-9b-it:free",
+        ],
+      },
+      
+      // MODEL ALIASES - switch with /model <alias>
+      // All models via OpenRouter: https://openrouter.ai/models
+      models: {
+        // Cheap models (default) - ~$0.25/1M input
+        "anthropic/claude-3-haiku": { alias: "cheap" },
+        "openai/gpt-4o-mini": { alias: "mini" },
+        
+        // Smart models (for complex tasks) - ~$3/1M input
+        "anthropic/claude-sonnet-4": { alias: "smart" },
+        "openai/gpt-4o": { alias: "gpt" },
+        
+        // Maximum power (use sparingly!) - ~$15/1M input
+        "anthropic/claude-opus-4": { alias: "opus" },
+        
+        // Open source alternatives
+        "meta-llama/llama-3.3-70b-instruct": { alias: "llama" },
+        "google/gemini-2.0-flash-001": { alias: "gemini" },
+        
+        // Future: local models via Ollama
+        // "ollama/llama3.3": { alias: "local" },
+      },
+      
+      // Sandbox: disabled inside container (already isolated)
+      sandbox: {
+        mode: "off",
+      },
+      
+      // Sub-agents: use CHEAP model (workers don't need to be smart)
+      subagents: {
+        model: "${SETH_SUBAGENT_MODEL}",  // anthropic/claude-haiku-3
+        maxConcurrent: 4,
+      },
+      
+      // THINKING: OFF by default to save tokens
+      // Enable for complex tasks: /thinking high
+      thinkingDefault: "off",
+      
+      // Timeout for agent runs (seconds)
+      timeoutSeconds: 900,
+    },
+    
+    // Agent definitions - extend for multi-agent "employee system"
+    list: [
+      {
+        id: "main",
+        default: true,
+        identity: {
+          name: "Seth",
+          theme: "secure personal assistant and task manager",
+          emoji: "🤖",
+        },
+        subagents: {
+          allowAgents: ["*"],
+        },
+      },
+      // Specialized workers (all use cheap models by default)
+      // Uncomment to enable:
+      //
+      // {
+      //   id: "researcher",
+      //   model: "anthropic/claude-haiku-3",  // Cheap for research
+      //   identity: { name: "Researcher", emoji: "🔍" },
+      //   tools: { allow: ["web_search", "web_fetch", "browser", "read"] },
+      // },
+      // {
+      //   id: "summarizer", 
+      //   model: "anthropic/claude-haiku-3",  // Cheap for summaries
+      //   identity: { name: "Summarizer", emoji: "📝" },
+      //   tools: { allow: ["read", "write"] },
+      // },
+    ],
+  },
+
+  // =========================================================================
+  // Browser Configuration (Full Playwright Control)
+  // =========================================================================
+  browser: {
+    enabled: true,
+    defaultProfile: "openclaw",
+    headless: true,
+    noSandbox: true,  // Required inside Docker
+    color: "#FF4500",
+    // Snapshot defaults for efficiency
+    snapshotDefaults: {
+      mode: "efficient",
+    },
+    profiles: {
+      openclaw: {
+        cdpPort: 18800,
+        color: "#FF4500",
+      },
+    },
+  },
+
+  // =========================================================================
+  // Skills Configuration
+  // =========================================================================
+  skills: {
+    load: {
+      extraDirs: ["/opt/seth/skills"],
+      watch: true,
+    },
+  },
+
+  // =========================================================================
+  // Tool Configuration (Full Power - Container Isolated)
+  // =========================================================================
+  tools: {
+    // All tools enabled by default - container provides isolation
+    // Use deny list only for tools you explicitly want to block
+    deny: [
+      "canvas",  // No UI canvas in headless Docker
+      "nodes",   // No companion app nodes
+    ],
+    
+    // Elevated mode disabled (container is the boundary)
+    elevated: {
+      enabled: false,
+    },
+    
+    // Exec tool configuration
+    exec: {
+      notifyOnExit: true,
+      pathPrepend: ["/home/seth/.local/bin"],
+    },
+    
+    // Web tools (search + fetch)
+    web: {
+      search: {
+        enabled: true,
+        maxResults: 10,
+      },
+      fetch: {
+        enabled: true,
+        maxChars: 50000,
+      },
+    },
+    
+    // Sub-agent tool policy (what sub-agents can use)
+    subagents: {
+      tools: {
+        deny: ["gateway", "cron"],  // Sub-agents can't restart gateway or schedule
+      },
+    },
+  },
+
+  // =========================================================================
+  // Cron Jobs (Scheduled Tasks)
+  // =========================================================================
+  cron: {
+    enabled: true,
+    maxConcurrentRuns: 2,
+  },
+
+  // =========================================================================
+  // Heartbeat (Proactive Agent)
+  // =========================================================================
+  heartbeat: {
+    enabled: false,  // Enable when you want proactive check-ins
+    // intervalMinutes: 30,
+    // tasks: ["check reminders", "review pending items"],
+  },
+
+  // =========================================================================
+  // Memory (Persistent Knowledge)
+  // =========================================================================
+  memory: {
+    enabled: true,
+    // Search results limit
+    searchLimit: 20,
+  },
+
+  // =========================================================================
+  // Messages Configuration
+  // =========================================================================
+  messages: {
+    responsePrefix: "[Seth]",
+    ackReaction: "🤖",
+    queue: {
+      mode: "collect",
+      debounceMs: 1000,
+      cap: 20,
+    },
+    // Group chat settings
+    groupChat: {
+      mentionPatterns: ["@seth", "@Seth"],
+    },
+  },
+
+  // =========================================================================
+  // Logging Configuration
+  // =========================================================================
+  logging: {
+    level: "info",
+    consoleStyle: "pretty",
+    redactSensitive: "tools",
+  },
+
+  // =========================================================================
+  // Session Configuration
+  // =========================================================================
+  session: {
+    pruning: {
+      enabled: true,
+      maxAgeDays: 30,
+    },
+  },
+
+  // =========================================================================
+  // Commands (Slash Commands)
+  // =========================================================================
+  commands: {
+    // Allow gateway restart via /restart command
+    restart: false,  // Keep false for security
+  },
+}

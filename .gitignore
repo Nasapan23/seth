@@ -1,0 +1,39 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+secrets/
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+
+# Runtime data (never commit)
+data/*
+!data/.gitkeep
+logs/
+tmp/
+
+# Docker
+docker-compose.override.yml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (if any local tooling)
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cache
+.cache/
