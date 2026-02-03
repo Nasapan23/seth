@@ -59,10 +59,8 @@ services:
       - seth_openclaw:/home/seth/.openclaw
       - seth_workspace:/home/seth/workspace
 
-      # Skills + prompts (from the repo checkout on the host)
-      - ./skills/local:/opt/seth/skills:ro
-      - ./skills/allowlist.yml:/opt/seth/allowlist.yml:ro
-      - ./prompts:/opt/seth/prompts:ro
+      # Skills + prompts are now baked into the Docker image (no bind mounts needed)
+      # This makes Swarm/Portainer Git-based stacks work reliably
 
       # Playwright cache (optional persistence)
       - seth_browser_cache:/home/seth/.cache/ms-playwright

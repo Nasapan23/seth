@@ -151,15 +151,23 @@ ENV OPENCLAW_CONFIG_PATH=/home/seth/.openclaw/openclaw.json
 ENV OPENCLAW_WORKSPACE=/home/seth/workspace
 
 # =============================================================================
-# Copy scripts and fix Windows line endings (CRLF -> LF)
+# Copy scripts, skills, and prompts into the image
 # =============================================================================
+# Scripts
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY scripts/healthcheck.sh /usr/local/bin/healthcheck.sh
+
+# Skills (baked into image for Swarm/Portainer compatibility)
+COPY skills/local /opt/seth/skills
+COPY skills/allowlist.yml /opt/seth/allowlist.yml
+
+# Prompts (baked into image for Swarm/Portainer compatibility)
+COPY prompts /opt/seth/prompts
 
 USER root
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh \
     && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh \
-    && chown seth:seth /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh
+    && chown -R seth:seth /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /opt/seth
 
 # =============================================================================
 # Runtime configuration
