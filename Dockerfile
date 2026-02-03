@@ -1,6 +1,6 @@
 # Seth - Secure OpenClaw Assistant
 # Multi-platform: works on ARM64 (Apple Silicon, Oracle ARM, Raspberry Pi) and x86_64
-# Ubuntu 24.04 with Node.js 22, OpenClaw, and Playwright
+# Ubuntu 24.04 with Node.js 22, OpenClaw, and Chrome/Chromium browser
 #
 # Build: docker compose build
 # Run:   docker compose up -d
@@ -27,7 +27,7 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 
 # =============================================================================
-# System dependencies + Chromium deps for Playwright
+# System dependencies + Chrome/Chromium browser dependencies
 # =============================================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core utilities
@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Build essentials (for native modules)
     build-essential \
     python3 \
-    # Playwright/Chromium dependencies (Ubuntu 24.04 naming)
+    # Chrome/Chromium browser dependencies (Ubuntu 24.04 naming)
     libasound2t64 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
@@ -106,17 +106,38 @@ RUN mkdir -p \
     && chown -R seth:seth /home/seth /opt/seth
 
 # =============================================================================
-# Install Playwright browsers (Chromium only for ARM64 compatibility)
+# Install Browser (Google Chrome for amd64, Chromium for arm64)
 # =============================================================================
+# Must run as root to install packages
+USER root
+
+# Install browser based on architecture
+# - amd64: Google Chrome (best compatibility, not available on ARM)
+# - arm64: Chromium from Ubuntu repos
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+        apt-get update \
+        && wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+        && dpkg -i google-chrome-stable_current_amd64.deb; \
+        apt-get install -f -y \
+        && rm -f google-chrome-stable_current_amd64.deb \
+        && rm -rf /var/lib/apt/lists/* \
+        && google-chrome-stable --version \
+        && echo "Google Chrome installed for amd64"; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends chromium-browser \
+        && rm -rf /var/lib/apt/lists/* \
+        && echo "Chromium installed for arm64"; \
+    else \
+        echo "Unknown architecture: $TARGETARCH - skipping browser install"; \
+    fi
+
+# Set browser executable path based on architecture
+ENV BROWSER_EXECUTABLE_PATH=${TARGETARCH:+/usr/bin/google-chrome-stable}
+# Note: entrypoint.sh will detect the correct path at runtime
+
 USER seth
 WORKDIR /home/seth
-
-# Set Playwright to use system chromium path
-ENV PLAYWRIGHT_BROWSERS_PATH=/home/seth/.cache/ms-playwright
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
-
-# Install only Chromium (Firefox/WebKit have ARM64 issues)
-RUN npx playwright install chromium --with-deps || true
 
 # =============================================================================
 # Environment configuration
@@ -130,13 +151,15 @@ ENV OPENCLAW_CONFIG_PATH=/home/seth/.openclaw/openclaw.json
 ENV OPENCLAW_WORKSPACE=/home/seth/workspace
 
 # =============================================================================
-# Copy scripts
+# Copy scripts and fix Windows line endings (CRLF -> LF)
 # =============================================================================
-COPY --chown=seth:seth scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY --chown=seth:seth scripts/healthcheck.sh /usr/local/bin/healthcheck.sh
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY scripts/healthcheck.sh /usr/local/bin/healthcheck.sh
 
 USER root
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh \
+    && chown seth:seth /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh
 
 # =============================================================================
 # Runtime configuration

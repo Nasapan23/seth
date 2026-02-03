@@ -16,6 +16,7 @@
   // Gateway Configuration
   // =========================================================================
   gateway: {
+    mode: "local",
     bind: "lan",
     port: 18789,
     auth: {
@@ -33,7 +34,7 @@
       // PRIMARY: Cheap model for casual chat, greetings, simple Q&A
       // Switch to smart model with: /model smart
       model: {
-        primary: "${SETH_MODEL}",  // anthropic/claude-haiku-3
+        primary: "${SETH_MODEL}",  // openrouter/anthropic/claude-3-haiku
         fallbacks: [
           "openrouter/meta-llama/llama-3.3-70b-instruct:free",
           "openrouter/google/gemma-2-9b-it:free",
@@ -44,19 +45,19 @@
       // All models via OpenRouter: https://openrouter.ai/models
       models: {
         // Cheap models (default) - ~$0.25/1M input
-        "anthropic/claude-3-haiku": { alias: "cheap" },
-        "openai/gpt-4o-mini": { alias: "mini" },
+        "openrouter/anthropic/claude-3-haiku": { alias: "cheap" },
+        "openrouter/openai/gpt-4o-mini": { alias: "mini" },
         
         // Smart models (for complex tasks) - ~$3/1M input
-        "anthropic/claude-sonnet-4": { alias: "smart" },
-        "openai/gpt-4o": { alias: "gpt" },
+        "openrouter/anthropic/claude-sonnet-4": { alias: "smart" },
+        "openrouter/openai/gpt-4o": { alias: "gpt" },
         
         // Maximum power (use sparingly!) - ~$15/1M input
-        "anthropic/claude-opus-4": { alias: "opus" },
+        "openrouter/anthropic/claude-opus-4": { alias: "opus" },
         
         // Open source alternatives
-        "meta-llama/llama-3.3-70b-instruct": { alias: "llama" },
-        "google/gemini-2.0-flash-001": { alias: "gemini" },
+        "openrouter/meta-llama/llama-3.3-70b-instruct": { alias: "llama" },
+        "openrouter/google/gemini-2.0-flash-001": { alias: "gemini" },
         
         // Future: local models via Ollama
         // "ollama/llama3.3": { alias: "local" },
@@ -69,7 +70,7 @@
       
       // Sub-agents: use CHEAP model (workers don't need to be smart)
       subagents: {
-        model: "${SETH_SUBAGENT_MODEL}",  // anthropic/claude-haiku-3
+        model: "${SETH_SUBAGENT_MODEL}",  // openrouter/anthropic/claude-3-haiku
         maxConcurrent: 4,
       },
       

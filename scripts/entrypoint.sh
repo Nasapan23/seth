@@ -51,6 +51,9 @@ init_directories() {
             fi
         done
     fi
+
+    # Secure state directory (doctor recommendation)
+    chmod 700 /home/seth/.openclaw 2>/dev/null || true
 }
 
 # =============================================================================
@@ -63,15 +66,17 @@ init_config() {
         log_info "Creating OpenClaw configuration (cost-optimized mode)..."
         
         # Model strategy from environment (OpenRouter model IDs)
-        local cheap_model="${SETH_MODEL:-anthropic/claude-3-haiku}"
-        local smart_model="${SETH_SMART_MODEL:-anthropic/claude-sonnet-4}"
-        local subagent_model="${SETH_SUBAGENT_MODEL:-anthropic/claude-3-haiku}"
+        local cheap_model="${SETH_MODEL:-openrouter/anthropic/claude-3-haiku}"
+        local smart_model="${SETH_SMART_MODEL:-openrouter/anthropic/claude-sonnet-4}"
+        local subagent_model="${SETH_SUBAGENT_MODEL:-openrouter/anthropic/claude-3-haiku}"
         local port="${SETH_PORT:-18789}"
+        local bind="${SETH_BIND:-loopback}"
         
         cat > "$config_file" << EOF
 {
   "gateway": {
-    "bind": "lan",
+    "mode": "local",
+    "bind": "${bind}",
     "port": ${port},
     "auth": {
       "mode": "token"
@@ -90,11 +95,11 @@ init_config() {
       "models": {
         "${cheap_model}": { "alias": "cheap" },
         "${smart_model}": { "alias": "smart" },
-        "anthropic/claude-opus-4": { "alias": "opus" },
-        "openai/gpt-4o-mini": { "alias": "mini" },
-        "openai/gpt-4o": { "alias": "gpt" },
-        "meta-llama/llama-3.3-70b-instruct": { "alias": "llama" },
-        "google/gemini-2.0-flash-001": { "alias": "gemini" }
+        "openrouter/anthropic/claude-opus-4": { "alias": "opus" },
+        "openrouter/openai/gpt-4o-mini": { "alias": "mini" },
+        "openrouter/openai/gpt-4o": { "alias": "gpt" },
+        "openrouter/meta-llama/llama-3.3-70b-instruct": { "alias": "llama" },
+        "openrouter/google/gemini-2.0-flash-001": { "alias": "gemini" }
       },
       "sandbox": {
         "mode": "off"
@@ -123,12 +128,18 @@ init_config() {
   },
   "browser": {
     "enabled": true,
+    "executablePath": "/usr/bin/google-chrome-stable",
     "defaultProfile": "openclaw",
     "headless": true,
     "noSandbox": true,
     "profiles": {
       "openclaw": {
-        "cdpPort": 18800
+        "cdpPort": 18800,
+        "color": "FFFFFF"
+      },
+      "chrome": {
+        "cdpPort": 18800,
+        "color": "FFFFFF"
       }
     }
   },
@@ -147,7 +158,7 @@ init_config() {
     },
     "web": {
       "search": {
-        "enabled": true,
+        "enabled": false,
         "maxResults": 10
       },
       "fetch": {
@@ -164,18 +175,9 @@ init_config() {
     "enabled": true,
     "maxConcurrentRuns": 2
   },
-  "memory": {
-    "enabled": true
-  },
   "logging": {
     "level": "info",
     "consoleStyle": "pretty"
-  },
-  "session": {
-    "pruning": {
-      "enabled": true,
-      "maxAgeDays": 30
-    }
   }
 }
 EOF
@@ -190,7 +192,6 @@ EOF
         log_info "    - Web search/fetch: ENABLED"
         log_info "    - Cron jobs: ENABLED"
         log_info "    - Sub-agents: ENABLED (max 4)"
-        log_info "    - Memory: ENABLED"
         log_info "  SWITCH MODELS:"
         log_info "    /model smart  - Complex tasks"
         log_info "    /model opus   - Maximum intelligence"
@@ -226,6 +227,125 @@ init_prompts() {
 }
 
 # =============================================================================
+# Detect browser executable path (Chrome for amd64, Chromium for arm64)
+# =============================================================================
+detect_browser_path() {
+    # Order of preference: Google Chrome, Chromium, chromium-browser
+    if [ -x "/usr/bin/google-chrome-stable" ]; then
+        echo "/usr/bin/google-chrome-stable"
+    elif [ -x "/usr/bin/chromium" ]; then
+        echo "/usr/bin/chromium"
+    elif [ -x "/usr/bin/chromium-browser" ]; then
+        echo "/usr/bin/chromium-browser"
+    elif [ -x "/snap/bin/chromium" ]; then
+        echo "/snap/bin/chromium"
+    else
+        echo ""
+    fi
+}
+
+# =============================================================================
+# Verify browser is working
+# =============================================================================
+verify_browser() {
+    local browser_path=$(detect_browser_path)
+    
+    if [ -z "$browser_path" ]; then
+        log_warn "No browser found! The browser tool will not work."
+        log_warn "Expected one of: google-chrome-stable, chromium, chromium-browser"
+        return 1
+    fi
+    
+    # Get browser version to verify it's executable
+    local version
+    version=$("$browser_path" --version 2>/dev/null || echo "")
+    
+    if [ -n "$version" ]; then
+        log_info "Browser verified: $version"
+        log_info "  Path: $browser_path"
+        return 0
+    else
+        log_warn "Browser found but could not get version: $browser_path"
+        return 1
+    fi
+}
+
+# =============================================================================
+# Sync env into config: gateway token + OpenRouter API key + browser path
+# Keeps config aligned with compose env so doctor and gateway use the same token
+# =============================================================================
+sync_config_from_env() {
+    if [ ! -f /home/seth/.openclaw/openclaw.json ]; then return 0; fi
+    
+    # Detect browser path
+    local browser_path=$(detect_browser_path)
+    if [ -n "$browser_path" ]; then
+        log_info "Detected browser: $browser_path"
+    else
+        log_warn "No browser detected! Browser tool will not work."
+    fi
+    
+    log_info "Syncing gateway token, bind, browser, and provider keys into config..."
+    BROWSER_PATH="$browser_path" node -e "
+        const fs = require('fs');
+        const path = '/home/seth/.openclaw/openclaw.json';
+        const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+        const token = process.env.SETH_GATEWAY_TOKEN;
+        const bind = process.env.SETH_BIND || 'loopback';
+        const openRouterKey = process.env.OPENROUTER_API_KEY;
+        const braveKey = process.env.BRAVE_API_KEY;
+        const browserPath = process.env.BROWSER_PATH;
+        
+        // Gateway config
+        if (token) {
+            config.gateway = config.gateway || {};
+            config.gateway.auth = config.gateway.auth || { mode: 'token' };
+            config.gateway.auth.token = token;
+        }
+        if (bind) {
+            config.gateway = config.gateway || {};
+            config.gateway.bind = bind;
+        }
+        
+        // Provider keys
+        if (openRouterKey) {
+            config.env = config.env || {};
+            config.env.OPENROUTER_API_KEY = openRouterKey;
+        }
+        
+        // Browser config
+        if (browserPath) {
+            config.browser = config.browser || {};
+            config.browser.enabled = true;
+            config.browser.executablePath = browserPath;
+            config.browser.headless = true;
+            config.browser.noSandbox = true;
+            config.browser.defaultProfile = 'openclaw';
+            config.browser.profiles = config.browser.profiles || {};
+            config.browser.profiles.openclaw = config.browser.profiles.openclaw || { cdpPort: 18800 };
+            config.browser.profiles.chrome = config.browser.profiles.chrome || { cdpPort: 18800 };
+        }
+        
+        // Web tools config
+        config.tools = config.tools || {};
+        config.tools.web = config.tools.web || { search: {}, fetch: {} };
+        config.tools.web.search = config.tools.web.search || {};
+        if (braveKey) {
+            config.tools.web.search.enabled = true;
+            config.tools.web.search.apiKey = braveKey;
+        } else {
+            config.tools.web.search.enabled = false;
+            delete config.tools.web.search.apiKey;
+        }
+        if (!config.tools.web.search.maxResults) config.tools.web.search.maxResults = 10;
+        config.tools.web.fetch = config.tools.web.fetch || {};
+        config.tools.web.fetch.enabled = true;
+        
+        fs.writeFileSync(path, JSON.stringify(config, null, 2));
+    " && log_info "Config synced (gateway + bind + browser + OpenRouter + web)" || log_warn "Could not sync config"
+}
+
+# =============================================================================
 # Validate environment
 # =============================================================================
 validate_env() {
@@ -251,17 +371,18 @@ validate_env() {
 # Run OpenClaw gateway
 # =============================================================================
 run_gateway() {
+    local bind="${SETH_BIND:-loopback}"
     log_info "Starting OpenClaw gateway..."
-    log_info "  Bind: ${SETH_BIND_ADDR:-0.0.0.0}:${SETH_PORT:-18789}"
-    log_info "  Model: ${SETH_MODEL:-anthropic/claude-sonnet-4-5}"
+    log_info "  Bind: $bind, port: ${SETH_PORT:-18789}"
+    log_info "  Model: ${SETH_MODEL:-openrouter/anthropic/claude-3-haiku}"
     
     # Export gateway token for OpenClaw
     export OPENCLAW_GATEWAY_TOKEN="$SETH_GATEWAY_TOKEN"
     
-    # Run the gateway
+    # Run the gateway (loopback = 127.0.0.1 only; lan = 0.0.0.0 for Docker/host access)
     exec openclaw gateway \
         --port "${SETH_PORT:-18789}" \
-        --bind lan \
+        --bind "$bind" \
         --token "$SETH_GATEWAY_TOKEN"
 }
 
@@ -294,7 +415,9 @@ main() {
     # Initialize
     validate_env
     init_directories
+    verify_browser
     init_config
+    sync_config_from_env
     init_prompts
     
     # Run based on mode

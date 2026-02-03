@@ -48,16 +48,16 @@ services:
     environment:
       # Gateway configuration
       - SETH_GATEWAY_TOKEN=${SETH_GATEWAY_TOKEN:?Gateway token is required}
-      - SETH_BIND_ADDR=${SETH_BIND_ADDR:-0.0.0.0}
+      - SETH_BIND=${SETH_BIND:-lan}
       - SETH_PORT=${SETH_PORT:-18789}
       
       # Model provider (OpenRouter - access to all models)
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       
       # Model strategy (cost optimization via OpenRouter)
-      - SETH_MODEL=${SETH_MODEL:-anthropic/claude-3-haiku}
-      - SETH_SMART_MODEL=${SETH_SMART_MODEL:-anthropic/claude-sonnet-4}
-      - SETH_SUBAGENT_MODEL=${SETH_SUBAGENT_MODEL:-anthropic/claude-3-haiku}
+      - SETH_MODEL=${SETH_MODEL:-openrouter/anthropic/claude-3-haiku}
+      - SETH_SMART_MODEL=${SETH_SMART_MODEL:-openrouter/anthropic/claude-sonnet-4}
+      - SETH_SUBAGENT_MODEL=${SETH_SUBAGENT_MODEL:-openrouter/anthropic/claude-3-haiku}
       
       # Optional features
       - BRAVE_API_KEY=${BRAVE_API_KEY:-}

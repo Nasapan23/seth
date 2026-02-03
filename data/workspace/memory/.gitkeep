@@ -1,0 +1,10 @@
+# Daily Notes Directory
+
+This folder contains daily notes in the format YYYY-MM-DD.md
+
+These are automatically read at session start (today's and yesterday's notes).
+Use for:
+- Running context and decisions
+- Tasks completed
+- Important discoveries
+- Session-specific notes

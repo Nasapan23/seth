@@ -11,6 +11,29 @@ secrets/
 # Runtime data (never commit)
 data/*
 !data/.gitkeep
+
+# But allow workspace template files
+!data/workspace/
+data/workspace/*
+!data/workspace/AGENTS.md
+!data/workspace/SOUL.md
+!data/workspace/IDENTITY.md
+!data/workspace/TOOLS.md
+!data/workspace/USER.md
+!data/workspace/HEARTBEAT.md
+!data/workspace/MEMORY.md
+!data/workspace/memory/
+data/workspace/memory/*
+!data/workspace/memory/.gitkeep
+
+# Ignore runtime state in workspace
+data/workspace/reminders/
+data/workspace/skills/
+data/workspace/*.log
+
+# Ignore openclaw runtime config (contains secrets)
+data/openclaw/
+
 logs/
 tmp/
 
