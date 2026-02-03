@@ -62,7 +62,7 @@ services:
       
       # Auto model routing
       - SETH_AUTO_ROUTING=${SETH_AUTO_ROUTING:-true}
-      - SETH_FREE_MODEL=${SETH_FREE_MODEL:-google/gemini-2.0-flash}
+      - SETH_FREE_MODEL=${SETH_FREE_MODEL:-google/gemini-3-flash-preview}
       - SETH_CODING_MODEL=${SETH_CODING_MODEL:-openrouter/anthropic/claude-sonnet-4}
       
       # Messaging channels

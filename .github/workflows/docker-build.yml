@@ -67,8 +67,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Stable cache scope improves reuse across tag-triggered builds
+          cache-from: type=gha,scope=seth-buildkit
+          cache-to: type=gha,mode=max,scope=seth-buildkit
           build-args: |
             OPENCLAW_VERSION=latest
 

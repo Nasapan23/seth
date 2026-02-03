@@ -45,7 +45,7 @@
     enabled: true,  // Set SETH_AUTO_ROUTING=false to disable
     
     // Default model when no pattern matches (uses FREE tier if available)
-    defaultModel: "${SETH_FREE_MODEL}",  // google/gemini-2.0-flash
+    defaultModel: "${SETH_FREE_MODEL}",  // google/gemini-3-flash-preview
     
     // Pattern-based routing rules
     rules: [
@@ -100,7 +100,7 @@
       models: {
         // FREE tier - Google Gemini (direct API, $0 cost)
         // Requires GOOGLE_AI_API_KEY in environment
-        "google/gemini-2.0-flash": { alias: "free" },
+        "google/gemini-3-flash-preview": { alias: "free" },
         
         // CODING tier - auto-selected for code tasks
         "openrouter/anthropic/claude-sonnet-4": { alias: "coding" },
