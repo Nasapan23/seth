@@ -339,7 +339,10 @@ sync_config_from_env() {
             config.agents.defaults.models[codingModel] = { alias: 'coding' };
         }
         
-        // Auto-routing configuration
+        // Auto-routing configuration (disabled - not yet supported by OpenClaw)
+        // Model aliases above will allow manual switching with /model <alias>
+        // Future: enable when OpenClaw supports routing config
+        /*
         if (autoRouting) {
             config.routing = config.routing || {};
             config.routing.enabled = true;
@@ -363,6 +366,7 @@ sync_config_from_env() {
                 '/research': { delegate: 'researcher' }
             };
         }
+        */
         
         // Browser config
         if (browserPath) {
@@ -392,15 +396,13 @@ sync_config_from_env() {
         config.tools.web.fetch = config.tools.web.fetch || {};
         config.tools.web.fetch.enabled = true;
         
-        // Telegram channel configuration
+        // Telegram channel configuration (simplified - advanced fields not yet supported)
         if (telegramToken) {
             config.channels = config.channels || {};
             config.channels.telegram = {
                 enabled: true,
-                botToken: telegramToken,
-                allowedUsers: telegramUsers ? telegramUsers.split(',').map(id => id.trim()).filter(Boolean) : [],
-                polling: { enabled: true },
-                webhook: { enabled: false }
+                botToken: telegramToken
+                // Future: add allowedUsers, polling, webhook when OpenClaw supports them
             };
         }
         
