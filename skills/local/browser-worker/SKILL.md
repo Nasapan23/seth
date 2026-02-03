@@ -31,31 +31,32 @@ Do NOT include:
 - Verbose action logs ("I clicked...", "I navigated...")
 - CDP/browser internal messages
 
-## Browser Operations
+## Browser Operations (OpenClaw docs)
+
+Reference: [Browser (OpenClaw-managed)](https://docs.openclaw.ai/tools/browser)
+
+You have **one tool**: `browser` — status / start / stop / tabs / open / focus / close / snapshot / screenshot / navigate / act.
 
 ### Starting the Browser
 
-```
-browser start --browser-profile openclaw
-```
+Always use the **openclaw** profile (managed headless browser):
 
-Always use `profile="openclaw"` for all browser tool calls.
+- Tool: `browser start` with `profile: "openclaw"`.
+- CLI: `openclaw browser start --browser-profile openclaw`.
 
-### Taking Snapshots
+### Snapshots and refs
 
-Use efficient mode for faster, cleaner output:
-
-```
-browser snapshot --efficient
-```
+- **Snapshot**: `browser snapshot` with `mode: "efficient"` (compact, good for extraction). Returns a UI tree with **refs** (numeric `12` or role `e12`).
+- **Actions**: Use refs from the last snapshot — `browser act` with `kind: "click"`, `ref: "<ref>"` or `kind: "type"`, `ref: "<ref>"`, `value: "text"`. **Refs are not stable across navigations** — after opening a new page, take a fresh snapshot and use new refs.
+- **Wait** (if needed): `browser wait` with `--url`, `--load networkidle`, or `--text "Done"` per docs.
 
 ### Navigation Pattern
 
-1. Navigate to URL
-2. Wait for page load (use `--load networkidle` if needed)
-3. Take efficient snapshot
-4. Extract needed information
-5. Return clean summary
+1. `browser open <url>` or `browser navigate <url>`.
+2. Wait for load (or use wait options if available).
+3. `browser snapshot` with `mode: "efficient"`.
+4. Extract info from snapshot text, or use refs for `browser act` (click/type).
+5. Return clean summary. Re-snapshot after any new navigation before using refs again.
 
 ### Screenshot Guidelines
 

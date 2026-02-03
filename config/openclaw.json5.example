@@ -39,43 +39,32 @@
   },
 
   // =========================================================================
-  // Auto Model Routing (Task-Based Selection)
+  // Model Routing Strategy
   // =========================================================================
-  routing: {
-    enabled: true,  // Set SETH_AUTO_ROUTING=false to disable
-    
-    // Default model when no pattern matches (uses FREE tier if available)
-    defaultModel: "${SETH_FREE_MODEL}",  // google/gemini-3-flash-preview
-    
-    // Pattern-based routing rules
-    rules: [
-      {
-        name: "coding",
-        // Triggers: code, debug, fix, implement, language names
-        patterns: [
-          "code", "debug", "fix", "implement", "refactor",
-          "function", "class", "variable", "error",
-          "typescript", "python", "javascript", "java", "rust", "go", "sql",
-          "html", "css", "react", "vue", "node"
-        ],
-        model: "${SETH_CODING_MODEL}",  // openrouter/anthropic/claude-sonnet-4
-      },
-      {
-        name: "research",
-        // Triggers: search, find, lookup, weather, news
-        patterns: ["search", "find", "research", "lookup", "weather", "news", "what is", "who is"],
-        delegate: "researcher",  // Delegate to researcher sub-agent
-      },
-    ],
-    
-    // Explicit command overrides (/code, /free, /smart, /research)
-    commands: {
-      "/code": "${SETH_CODING_MODEL}",
-      "/free": "${SETH_FREE_MODEL}",
-      "/smart": "openrouter/anthropic/claude-sonnet-4",
-      "/research": { delegate: "researcher" },
-    },
-  },
+  // OpenClaw 2026.2.1 does NOT support a top-level "routing" key
+  // Instead, use one of these approaches:
+  //
+  // OPTION 1: OpenRouter Auto Model (Recommended for automatic routing)
+  //   - Set model.primary to "openrouter/auto"
+  //   - OpenRouter automatically selects the best model for each task
+  //   - Powered by NotDiamond's routing engine
+  //   - Handles complexity detection automatically
+  //
+  // OPTION 2: Manual Model Switching (Cost-optimized approach)
+  //   - Set model.primary to a cheap model (e.g., claude-3-haiku)
+  //   - Switch models mid-chat with /model commands:
+  //     /model free    -> Google Gemini (zero cost)
+  //     /model coding  -> Claude Sonnet (best for code)
+  //     /model auto    -> OpenRouter Auto (intelligent routing)
+  //     /model smart   -> Claude Sonnet (complex tasks)
+  //     /model opus    -> Claude Opus (maximum power)
+  //
+  // OPTION 3: Specialized Sub-Agents
+  //   - Create sub-agents with specific models for specific tasks
+  //   - Main agent delegates to specialists (see agents.list below)
+  //   - Example: researcher agent for web research, coder agent for coding
+  //
+  // The model aliases are defined in agents.defaults.models below
 
   // =========================================================================
   // Agent Configuration (Auto-Routing Enabled)
@@ -98,27 +87,37 @@
       // Models available via OpenRouter: https://openrouter.ai/models
       // Direct Google Gemini: https://aistudio.google.com
       models: {
+        // AUTOMATIC ROUTING - OpenRouter selects best model for each task
+        "openrouter/auto": { alias: "auto" },
+        
         // FREE tier - Google Gemini (direct API, $0 cost)
         // Requires GOOGLE_AI_API_KEY in environment
         "google/gemini-3-flash-preview": { alias: "free" },
         
-        // CODING tier - auto-selected for code tasks
-        "openrouter/anthropic/claude-sonnet-4": { alias: "coding" },
+        // CODING tier - best for code generation, debugging, refactoring
+        "openrouter/anthropic/claude-sonnet-4": { 
+          alias: "coding",
+          // Cost: ~$3/1M input, $15/1M output
+        },
         
-        // Cheap models - ~$0.25/1M input
+        // Cheap models - ~$0.25/1M input, great for chat
         "openrouter/anthropic/claude-3-haiku": { alias: "cheap" },
         "openrouter/openai/gpt-4o-mini": { alias: "mini" },
         
-        // Smart models (for complex tasks) - ~$3/1M input
+        // Smart models (for complex reasoning) - ~$3/1M input
         "openrouter/anthropic/claude-sonnet-4": { alias: "smart" },
         "openrouter/openai/gpt-4o": { alias: "gpt" },
         
         // Maximum power (use sparingly!) - ~$15/1M input
         "openrouter/anthropic/claude-opus-4": { alias: "opus" },
         
-        // Open source alternatives
+        // Open source alternatives - many are FREE on OpenRouter
         "openrouter/meta-llama/llama-3.3-70b-instruct": { alias: "llama" },
         "openrouter/google/gemini-2.0-flash-001": { alias: "gemini" },
+        "openrouter/qwen/qwen-2.5-coder-32b-instruct": { 
+          alias: "qwen-coder",
+          // Free coding-specialized model
+        },
         
         // Future: local models via Ollama
         // "ollama/llama3.3": { alias: "local" },
@@ -157,18 +156,29 @@
           allowAgents: ["*"],
         },
       },
-      // Specialized workers (all use cheap models by default)
-      // Uncomment to enable:
+      // Specialized workers - delegates for specific tasks
+      // Uncomment to enable sub-agents:
       //
+      // RESEARCHER - Web research and information gathering
       // {
       //   id: "researcher",
-      //   model: "anthropic/claude-haiku-3",  // Cheap for research
+      //   model: "openrouter/anthropic/claude-3-haiku",  // Cheap is fine
       //   identity: { name: "Researcher", emoji: "🔍" },
       //   tools: { allow: ["web_search", "web_fetch", "browser", "read"] },
       // },
+      //
+      // CODER - Code generation and debugging (uses best coding model)
+      // {
+      //   id: "coder",
+      //   model: "openrouter/anthropic/claude-sonnet-4",  // Best for code
+      //   identity: { name: "Coder", emoji: "💻" },
+      //   tools: { allow: ["read", "write", "exec", "shell"] },
+      // },
+      //
+      // SUMMARIZER - Document processing and summarization
       // {
       //   id: "summarizer", 
-      //   model: "anthropic/claude-haiku-3",  // Cheap for summaries
+      //   model: "openrouter/anthropic/claude-3-haiku",  // Cheap is fine
       //   identity: { name: "Summarizer", emoji: "📝" },
       //   tools: { allow: ["read", "write"] },
       // },
@@ -249,20 +259,29 @@
   },
 
   // =========================================================================
-  // Cron Jobs (Scheduled Tasks)
+  // Cron Jobs (Scheduled Tasks & Reminders)
   // =========================================================================
   cron: {
     enabled: true,
     maxConcurrentRuns: 2,
   },
+  // NOTE: OpenClaw 2026.2.1 does NOT support defaultWakeMode / defaultSessionTarget.
+  // When creating reminders, ask Seth to use "immediate" wake mode and "last" session
+  // so notifications arrive on Telegram. See data/workspace/REMINDERS.md for details.
 
   // =========================================================================
-  // Heartbeat (Proactive Agent)
+  // Heartbeat (Proactive Agent Check-ins)
   // =========================================================================
   heartbeat: {
-    enabled: false,  // Enable when you want proactive check-ins
-    // intervalMinutes: 30,
+    enabled: false,  // Enable for proactive periodic check-ins
+    // When enabled, Seth will periodically check in even without messages
+    
+    // intervalMinutes: 30,  // How often to check in
     // tasks: ["check reminders", "review pending items"],
+    
+    // NOTE: Heartbeat is NOT required for cron jobs!
+    // Cron jobs with wakeMode: "immediate" will notify instantly.
+    // Heartbeat is only for proactive check-ins and "next-heartbeat" cron jobs.
   },
 
   // =========================================================================

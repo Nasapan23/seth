@@ -17,6 +17,10 @@ services:
       - SETGID
       - SYS_ADMIN
 
+    # Chrome/Chromium needs more shared memory than Docker default (64MB)
+    # Without this, CDP fails: "Failed to start Chrome CDP on port 18800"
+    shm_size: '1gb'
+
     environment:
       # REQUIRED
       - SETH_GATEWAY_TOKEN=${SETH_GATEWAY_TOKEN:?set_in_portainer}
@@ -65,12 +69,11 @@ services:
       # Playwright cache (optional persistence)
       - seth_browser_cache:/home/seth/.cache/ms-playwright
 
-      # Temp filesystem
+      # Temp filesystem (browser + logs + temp files, 512MB)
       - type: tmpfs
         target: /tmp
         tmpfs:
-          # Portainer expects an integer number of bytes
-          size: 268435456
+          size: 536870912
 
     ports:
       - "${SETH_PORT:-18789}:18789"
@@ -82,6 +85,13 @@ services:
     deploy:
       mode: replicated
       replicas: 1
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '0.5'
+          memory: 2G
       restart_policy:
         condition: any
         delay: 5s

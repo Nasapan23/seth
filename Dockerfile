@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     git \
+    gh \
     # Build essentials (for native modules)
     build-essential \
     python3 \
@@ -65,6 +66,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxkbcommon0 \
     libxrandr2 \
     libxshmfence1 \
+    # Virtual display for headless browser (Xvfb)
+    xvfb \
     # Fonts
     fonts-liberation \
     fonts-noto-color-emoji \
@@ -150,6 +153,9 @@ ENV OPENCLAW_CONFIG_PATH=/home/seth/.openclaw/openclaw.json
 # OpenClaw paths
 ENV OPENCLAW_WORKSPACE=/home/seth/workspace
 
+# Virtual display for Chrome/Playwright (Xvfb)
+ENV DISPLAY=:99
+
 # =============================================================================
 # Copy scripts, skills, and prompts into the image
 # =============================================================================
@@ -170,9 +176,9 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh 
     && chown -R seth:seth /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh /opt/seth
 
 # =============================================================================
-# Runtime configuration
+# Runtime configuration (start as root so entrypoint can chown volume mounts)
 # =============================================================================
-USER seth
+USER root
 WORKDIR /home/seth
 
 # Ports: Gateway (18789), Browser CDP (18800)

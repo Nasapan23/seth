@@ -36,13 +36,19 @@ services:
       - SETGID
       - SYS_ADMIN  # Required for Chromium sandbox (alternative to --no-sandbox)
     
-    # Resource limits
+    # Resource limits (generous for gateway + browser + sub-agents)
     deploy:
       resources:
         limits:
-          memory: 4G
+          cpus: '4'
+          memory: 8G
         reservations:
-          memory: 1G
+          cpus: '0.5'
+          memory: 2G
+    
+    # Chrome/Chromium needs more shared memory than Docker default (64MB)
+    # Without this, CDP fails: "Failed to start Chrome CDP on port 18800"
+    shm_size: '1gb'
     
     # Environment
     environment:
@@ -96,11 +102,11 @@ services:
       # Playwright browser cache (optional persistence)
       - seth_browser_cache:/home/seth/.cache/ms-playwright
       
-      # Temp filesystem
+      # Temp filesystem (browser + logs + temp files)
       - type: tmpfs
         target: /tmp
         tmpfs:
-          size: 256M
+          size: 512M
     
     # Ports - exposed for nginx reverse proxy
     ports:
