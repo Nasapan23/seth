@@ -1,0 +1,124 @@
+version: "3.8"
+
+services:
+  seth:
+    image: nisipeanu/seth:${SETH_IMAGE_TAG:-v1.0.2}
+
+    # Swarm notes:
+    # - `container_name` is not supported by Swarm services
+    # - `restart:` is replaced by `deploy.restart_policy`
+    # - `security_opt` is not supported by Portainer Swarm stacks in many setups
+
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - SYS_ADMIN
+
+    environment:
+      # REQUIRED
+      - SETH_GATEWAY_TOKEN=${SETH_GATEWAY_TOKEN:?set_in_portainer}
+
+      # Gateway config
+      - SETH_BIND=${SETH_BIND:-lan}
+      - SETH_PORT=${SETH_PORT:-18789}
+      - SETH_BROWSER_CDP_PORT=${SETH_BROWSER_CDP_PORT:-18800}
+
+      # Model providers (set via Portainer)
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
+
+      # Baseline models
+      - SETH_MODEL=${SETH_MODEL:-openrouter/anthropic/claude-3-haiku}
+      - SETH_SMART_MODEL=${SETH_SMART_MODEL:-openrouter/anthropic/claude-sonnet-4}
+      - SETH_SUBAGENT_MODEL=${SETH_SUBAGENT_MODEL:-openrouter/anthropic/claude-3-haiku}
+
+      # Auto model routing
+      - SETH_AUTO_ROUTING=${SETH_AUTO_ROUTING:-true}
+      - SETH_FREE_MODEL=${SETH_FREE_MODEL:-google/gemini-3-flash-preview}
+      - SETH_CODING_MODEL=${SETH_CODING_MODEL:-openrouter/anthropic/claude-sonnet-4}
+
+      # Telegram (optional)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS:-}
+
+      # Optional web tools
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+
+      # Voice (optional)
+      - SETH_VOICE_ENABLED=${SETH_VOICE_ENABLED:-false}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-}
+
+    volumes:
+      # OpenClaw config/state + workspace (persistent)
+      # Use named volumes in Swarm so we don't depend on host paths existing
+      - seth_openclaw:/home/seth/.openclaw
+      - seth_workspace:/home/seth/workspace
+
+      # Skills + prompts (from the repo checkout on the host)
+      - ./skills/local:/opt/seth/skills:ro
+      - ./skills/allowlist.yml:/opt/seth/allowlist.yml:ro
+      - ./prompts:/opt/seth/prompts:ro
+
+      # Playwright cache (optional persistence)
+      - seth_browser_cache:/home/seth/.cache/ms-playwright
+
+      # Temp filesystem
+      - type: tmpfs
+        target: /tmp
+        tmpfs:
+          # Portainer expects an integer number of bytes
+          size: 268435456
+
+    ports:
+      - "${SETH_PORT:-18789}:18789"
+      - "${SETH_BROWSER_CDP_PORT:-18800}:18800"
+
+    networks:
+      - seth_net
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 0
+        window: 30s
+      update_config:
+        order: start-first
+        failure_action: rollback
+        parallelism: 1
+      rollback_config:
+        order: stop-first
+        parallelism: 1
+      # Important: this stack bind-mounts repo paths (./prompts, ./skills, ./data).
+      # Constrain to the manager node where Portainer stores the stack's files.
+      placement:
+        constraints:
+          - node.role == manager
+
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  seth_net:
+    driver: overlay
+    attachable: true
+
+volumes:
+  seth_openclaw:
+    name: seth_openclaw
+  seth_workspace:
+    name: seth_workspace
+  seth_browser_cache:
+    name: seth_browser_cache
+
