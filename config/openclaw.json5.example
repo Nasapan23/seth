@@ -1,10 +1,11 @@
-// Seth - OpenClaw Configuration Template (Cost-Optimized Edition)
+// Seth - OpenClaw Configuration Template (Auto-Routing Edition)
 // Copy to data/openclaw/openclaw.json and customize
 // JSON5 format: comments and trailing commas allowed
 //
-// COST OPTIMIZATION STRATEGY:
-// - Default model: CHEAP (Haiku/GPT-4o-mini) for casual chat
-// - Smart model: Sonnet for complex tasks (switch with /model smart)
+// MODEL ROUTING STRATEGY:
+// - FREE tier: Google Gemini for casual chat (zero cost with GOOGLE_AI_API_KEY)
+// - CODING tier: Claude Sonnet for code tasks (auto-triggered)
+// - SMART tier: Claude Sonnet for complex tasks (manual /model smart)
 // - Sub-agents: CHEAP model (workers don't need to be smart)
 // - Thinking: OFF by default (saves tokens)
 // - Fallbacks: FREE OpenRouter models when rate-limited
@@ -25,7 +26,59 @@
   },
 
   // =========================================================================
-  // Agent Configuration (Cost-Optimized)
+  // Provider Configuration (API Keys synced from environment)
+  // =========================================================================
+  // API keys are synced from environment variables by entrypoint.sh
+  // Set these in .env file, not here:
+  //   - OPENROUTER_API_KEY (access to all models via OpenRouter)
+  //   - GOOGLE_AI_API_KEY (direct Gemini access, FREE tier)
+  //   - ANTHROPIC_API_KEY (direct Anthropic access)
+  //   - OPENAI_API_KEY (direct OpenAI access)
+  env: {
+    // Keys injected at runtime from environment
+  },
+
+  // =========================================================================
+  // Auto Model Routing (Task-Based Selection)
+  // =========================================================================
+  routing: {
+    enabled: true,  // Set SETH_AUTO_ROUTING=false to disable
+    
+    // Default model when no pattern matches (uses FREE tier if available)
+    defaultModel: "${SETH_FREE_MODEL}",  // google/gemini-2.0-flash
+    
+    // Pattern-based routing rules
+    rules: [
+      {
+        name: "coding",
+        // Triggers: code, debug, fix, implement, language names
+        patterns: [
+          "code", "debug", "fix", "implement", "refactor",
+          "function", "class", "variable", "error",
+          "typescript", "python", "javascript", "java", "rust", "go", "sql",
+          "html", "css", "react", "vue", "node"
+        ],
+        model: "${SETH_CODING_MODEL}",  // openrouter/anthropic/claude-sonnet-4
+      },
+      {
+        name: "research",
+        // Triggers: search, find, lookup, weather, news
+        patterns: ["search", "find", "research", "lookup", "weather", "news", "what is", "who is"],
+        delegate: "researcher",  // Delegate to researcher sub-agent
+      },
+    ],
+    
+    // Explicit command overrides (/code, /free, /smart, /research)
+    commands: {
+      "/code": "${SETH_CODING_MODEL}",
+      "/free": "${SETH_FREE_MODEL}",
+      "/smart": "openrouter/anthropic/claude-sonnet-4",
+      "/research": { delegate: "researcher" },
+    },
+  },
+
+  // =========================================================================
+  // Agent Configuration (Auto-Routing Enabled)
   // =========================================================================
   agents: {
     defaults: {
@@ -42,9 +95,17 @@
       },
       
       // MODEL ALIASES - switch with /model <alias>
-      // All models via OpenRouter: https://openrouter.ai/models
+      // Models available via OpenRouter: https://openrouter.ai/models
+      // Direct Google Gemini: https://aistudio.google.com
       models: {
-        // Cheap models (default) - ~$0.25/1M input
+        // FREE tier - Google Gemini (direct API, $0 cost)
+        // Requires GOOGLE_AI_API_KEY in environment
+        "google/gemini-2.0-flash": { alias: "free" },
+        
+        // CODING tier - auto-selected for code tasks
+        "openrouter/anthropic/claude-sonnet-4": { alias: "coding" },
+        
+        // Cheap models - ~$0.25/1M input
         "openrouter/anthropic/claude-3-haiku": { alias: "cheap" },
         "openrouter/openai/gpt-4o-mini": { alias: "mini" },
         
@@ -255,5 +316,39 @@
   commands: {
     // Allow gateway restart via /restart command
     restart: false,  // Keep false for security
+  },
+
+  // =========================================================================
+  // Messaging Channels
+  // =========================================================================
+  channels: {
+    // Telegram Bot Integration
+    // Set TELEGRAM_BOT_TOKEN in environment to enable
+    // Create bot via @BotFather on Telegram
+    telegram: {
+      enabled: false,  // Set to true when TELEGRAM_BOT_TOKEN is configured
+      // botToken: injected from TELEGRAM_BOT_TOKEN env var
+      
+      // Restrict access to specific Telegram user IDs (optional)
+      // Leave empty to allow all users
+      // Get your ID by messaging @userinfobot on Telegram
+      allowedUsers: [],  // e.g., ["123456789", "987654321"]
+      
+      // Use polling (simpler) or webhook (more efficient for high traffic)
+      polling: {
+        enabled: true,
+        interval: 1000,  // ms between polls
+      },
+      webhook: {
+        enabled: false,
+        // url: "https://your-domain.com/webhook/telegram",
+        // secret: "your-webhook-secret",
+      },
+    },
+    
+    // Future channels (Phase 2+)
+    // discord: { enabled: false },
+    // slack: { enabled: false },
+    // whatsapp: { enabled: false },
   },
 }

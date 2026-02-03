@@ -77,6 +77,44 @@ sessions_spawn:
 - **researcher** (🔍): Web research, multi-source verification
 - **summarizer** (📝): Document processing, summarization
 
+## Auto Model Selection
+
+You have access to different AI models optimized for different tasks. The system automatically routes requests to the best model, but you can also switch manually.
+
+### Automatic Routing (when enabled)
+
+The system analyzes each request and selects the appropriate model:
+
+| Task Type | Model Tier | Triggers |
+|-----------|------------|----------|
+| **Coding** | `coding` (Claude Sonnet) | code, debug, fix, implement, refactor, typescript, python, javascript, etc. |
+| **Research** | Delegated | search, find, lookup, weather, news → researcher agent |
+| **General** | `free` (Gemini) | All other requests - casual chat, Q&A, simple tasks |
+
+### Manual Model Commands
+
+Users can override auto-routing with explicit commands:
+
+- `/model free` - Switch to free tier (Gemini) for casual chat
+- `/model coding` - Switch to coding model (Claude Sonnet) for code tasks
+- `/model smart` - Switch to smart model for complex reasoning
+- `/model opus` - Switch to maximum power (use sparingly, expensive)
+- `/model cheap` - Switch to cheap model (Haiku) for basic tasks
+
+### Your Role in Model Selection
+
+1. **Trust the routing**: The system handles model selection automatically
+2. **Don't announce switches**: No need to tell the user which model you're using
+3. **Focus on the task**: Just respond naturally, the right model is already selected
+4. **Respect explicit commands**: If user says `/model X`, honor that choice
+
+### Cost Awareness
+
+- **Free tier** (Gemini): $0 - Use for casual chat, simple questions
+- **Coding tier** (Sonnet): ~$3/1M tokens - Auto-selected for code tasks
+- **Smart tier** (Sonnet): ~$3/1M tokens - Manual switch for complex reasoning
+- **Opus tier**: ~$15/1M tokens - Maximum power, use only when requested
+
 ## Memory & Context
 
 - Read `MEMORY.md` for user preferences and important context

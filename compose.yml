@@ -51,13 +51,23 @@ services:
       - SETH_BIND=${SETH_BIND:-lan}
       - SETH_PORT=${SETH_PORT:-18789}
       
-      # Model provider (OpenRouter - access to all models)
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # Model providers
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
       
-      # Model strategy (cost optimization via OpenRouter)
+      # Model strategy (cost optimization)
       - SETH_MODEL=${SETH_MODEL:-openrouter/anthropic/claude-3-haiku}
       - SETH_SMART_MODEL=${SETH_SMART_MODEL:-openrouter/anthropic/claude-sonnet-4}
       - SETH_SUBAGENT_MODEL=${SETH_SUBAGENT_MODEL:-openrouter/anthropic/claude-3-haiku}
+      
+      # Auto model routing
+      - SETH_AUTO_ROUTING=${SETH_AUTO_ROUTING:-true}
+      - SETH_FREE_MODEL=${SETH_FREE_MODEL:-google/gemini-2.0-flash}
+      - SETH_CODING_MODEL=${SETH_CODING_MODEL:-openrouter/anthropic/claude-sonnet-4}
+      
+      # Messaging channels
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_ALLOWED_USERS=${TELEGRAM_ALLOWED_USERS:-}
       
       # Optional features
       - BRAVE_API_KEY=${BRAVE_API_KEY:-}

@@ -271,7 +271,7 @@ verify_browser() {
 }
 
 # =============================================================================
-# Sync env into config: gateway token + OpenRouter API key + browser path
+# Sync env into config: gateway token + API keys + browser + channels
 # Keeps config aligned with compose env so doctor and gateway use the same token
 # =============================================================================
 sync_config_from_env() {
@@ -285,16 +285,24 @@ sync_config_from_env() {
         log_warn "No browser detected! Browser tool will not work."
     fi
     
-    log_info "Syncing gateway token, bind, browser, and provider keys into config..."
+    log_info "Syncing configuration from environment..."
     BROWSER_PATH="$browser_path" node -e "
         const fs = require('fs');
-        const path = '/home/seth/.openclaw/openclaw.json';
-        const config = JSON.parse(fs.readFileSync(path, 'utf8'));
+        const configPath = '/home/seth/.openclaw/openclaw.json';
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+        
+        // Environment variables
         const token = process.env.SETH_GATEWAY_TOKEN;
         const bind = process.env.SETH_BIND || 'loopback';
         const openRouterKey = process.env.OPENROUTER_API_KEY;
+        const googleAiKey = process.env.GOOGLE_AI_API_KEY;
         const braveKey = process.env.BRAVE_API_KEY;
         const browserPath = process.env.BROWSER_PATH;
+        const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
+        const telegramUsers = process.env.TELEGRAM_ALLOWED_USERS;
+        const freeModel = process.env.SETH_FREE_MODEL;
+        const codingModel = process.env.SETH_CODING_MODEL;
+        const autoRouting = process.env.SETH_AUTO_ROUTING !== 'false';
         
         // Gateway config
         if (token) {
@@ -307,10 +315,53 @@ sync_config_from_env() {
             config.gateway.bind = bind;
         }
         
-        // Provider keys
+        // Provider keys (env section)
+        config.env = config.env || {};
         if (openRouterKey) {
-            config.env = config.env || {};
             config.env.OPENROUTER_API_KEY = openRouterKey;
+        }
+        if (googleAiKey) {
+            config.env.GOOGLE_AI_API_KEY = googleAiKey;
+        }
+        
+        // Model aliases for auto-routing
+        config.agents = config.agents || {};
+        config.agents.defaults = config.agents.defaults || {};
+        config.agents.defaults.models = config.agents.defaults.models || {};
+        
+        // Add free tier model (Google Gemini)
+        if (freeModel && googleAiKey) {
+            config.agents.defaults.models[freeModel] = { alias: 'free' };
+        }
+        
+        // Add coding model
+        if (codingModel) {
+            config.agents.defaults.models[codingModel] = { alias: 'coding' };
+        }
+        
+        // Auto-routing configuration
+        if (autoRouting) {
+            config.routing = config.routing || {};
+            config.routing.enabled = true;
+            config.routing.rules = [
+                {
+                    name: 'coding',
+                    patterns: ['code', 'debug', 'fix', 'implement', 'refactor', 'function', 'class', 'typescript', 'python', 'javascript', 'java', 'rust', 'go', 'sql'],
+                    model: codingModel || 'openrouter/anthropic/claude-sonnet-4'
+                },
+                {
+                    name: 'research',
+                    patterns: ['search', 'find', 'research', 'lookup', 'weather', 'news', 'what is', 'who is'],
+                    delegate: 'researcher'
+                }
+            ];
+            config.routing.defaultModel = (freeModel && googleAiKey) ? freeModel : (process.env.SETH_MODEL || 'openrouter/anthropic/claude-3-haiku');
+            config.routing.commands = {
+                '/code': codingModel || 'openrouter/anthropic/claude-sonnet-4',
+                '/free': freeModel || 'openrouter/anthropic/claude-3-haiku',
+                '/smart': 'openrouter/anthropic/claude-sonnet-4',
+                '/research': { delegate: 'researcher' }
+            };
         }
         
         // Browser config
@@ -341,8 +392,20 @@ sync_config_from_env() {
         config.tools.web.fetch = config.tools.web.fetch || {};
         config.tools.web.fetch.enabled = true;
         
-        fs.writeFileSync(path, JSON.stringify(config, null, 2));
-    " && log_info "Config synced (gateway + bind + browser + OpenRouter + web)" || log_warn "Could not sync config"
+        // Telegram channel configuration
+        if (telegramToken) {
+            config.channels = config.channels || {};
+            config.channels.telegram = {
+                enabled: true,
+                botToken: telegramToken,
+                allowedUsers: telegramUsers ? telegramUsers.split(',').map(id => id.trim()).filter(Boolean) : [],
+                polling: { enabled: true },
+                webhook: { enabled: false }
+            };
+        }
+        
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    " && log_info "Config synced (gateway + providers + routing + channels)" || log_warn "Could not sync config"
 }
 
 # =============================================================================
@@ -359,9 +422,26 @@ validate_env() {
     fi
     
     # Check for at least one model provider
-    if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
+    if [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$OPENAI_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ] && [ -z "$GOOGLE_AI_API_KEY" ]; then
         log_warn "No model provider API key found!"
-        log_warn "Set one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY"
+        log_warn "Set one of: OPENROUTER_API_KEY, GOOGLE_AI_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY"
+    fi
+    
+    # Log active providers
+    log_info "Active providers:"
+    [ -n "$OPENROUTER_API_KEY" ] && log_info "  - OpenRouter: ENABLED"
+    [ -n "$GOOGLE_AI_API_KEY" ] && log_info "  - Google AI (Gemini): ENABLED (free tier)"
+    [ -n "$ANTHROPIC_API_KEY" ] && log_info "  - Anthropic: ENABLED"
+    [ -n "$OPENAI_API_KEY" ] && log_info "  - OpenAI: ENABLED"
+    
+    # Log active channels
+    [ -n "$TELEGRAM_BOT_TOKEN" ] && log_info "  - Telegram: ENABLED"
+    
+    # Auto-routing status
+    if [ "${SETH_AUTO_ROUTING:-true}" = "true" ]; then
+        log_info "Auto model routing: ENABLED"
+        [ -n "$SETH_FREE_MODEL" ] && log_info "  - Free tier: ${SETH_FREE_MODEL}"
+        [ -n "$SETH_CODING_MODEL" ] && log_info "  - Coding: ${SETH_CODING_MODEL}"
     fi
     
     log_info "Environment validated"
@@ -374,10 +454,25 @@ run_gateway() {
     local bind="${SETH_BIND:-loopback}"
     log_info "Starting OpenClaw gateway..."
     log_info "  Bind: $bind, port: ${SETH_PORT:-18789}"
-    log_info "  Model: ${SETH_MODEL:-openrouter/anthropic/claude-3-haiku}"
+    log_info "  Default model: ${SETH_MODEL:-openrouter/anthropic/claude-3-haiku}"
+    
+    # Log auto-routing configuration
+    if [ "${SETH_AUTO_ROUTING:-true}" = "true" ]; then
+        log_info "  Auto-routing: ENABLED"
+        [ -n "$GOOGLE_AI_API_KEY" ] && [ -n "$SETH_FREE_MODEL" ] && \
+            log_info "    Free tier: ${SETH_FREE_MODEL}"
+        [ -n "$SETH_CODING_MODEL" ] && \
+            log_info "    Coding: ${SETH_CODING_MODEL}"
+    fi
+    
+    # Log channels
+    [ -n "$TELEGRAM_BOT_TOKEN" ] && log_info "  Telegram: ENABLED"
     
     # Export gateway token for OpenClaw
     export OPENCLAW_GATEWAY_TOKEN="$SETH_GATEWAY_TOKEN"
+    
+    # Export Google AI key if present
+    [ -n "$GOOGLE_AI_API_KEY" ] && export GOOGLE_AI_API_KEY="$GOOGLE_AI_API_KEY"
     
     # Run the gateway (loopback = 127.0.0.1 only; lan = 0.0.0.0 for Docker/host access)
     exec openclaw gateway \
